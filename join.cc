@@ -167,40 +167,44 @@ void reduce(std::map<int,std::map<int,float>>& G)
 }
 
 //dijkstra's algorithm
-std::map<int,float> dijk(std::map<int,std::map<int,float> > G, int s)
+std::pair<int,std::map<int,float>> dijk(std::map<int,std::map<int,float> > G, int s)
 {
 	std::map<int,float> l;
 	std::vector<int> R = {};
 	std::vector<int> V = {};
+	int min;
+
 	for (int i=0;i<G.size();i++)
 	{
 		V.push_back(i);
 		l.insert(std::pair<int,float>(i,std::numeric_limits<float>::infinity()));
 	}
 	l[s] = 0;
-	
-	iter = intersect(V,symmetric(R,V));
-	min=l.at(iter.at(0));
-	for (int i=1;i<iter.size();i++)
+	std::vector<int> iter = intersection(V,symmetric(R,V));
+	while (iter.size() > 0 )
 	{
-		if (l.at(iter.at(i)) < l.at(min))
+		min = iter.at(0);
+		for (int i=1;i<iter.size();i++)
 		{
-			min=iter.at(i);
-		}
-	}
-	R.push_back(min);
-	iter = intersect(V,symmetric(R,V));
-	for (int i=0;i<iter.size();i++)
-	{
-		id = G.at(min).find(iter.at(i));
-		if (id !=G.at(min).end())
-		{
-			if (l.at(iter.at(i)) > (l.at(min) + ))
+			if (l.at(iter.at(i)) < l.at(min))
 			{
-				
+				min=iter.at(i);
+			}
+		}
+		R = union_1(R,std::vector<int> {min});
+		iter = intersection(V,symmetric(R,V));
+		for (int i=0;i<iter.size();i++)
+		{
+			if (G.at(min).find(iter.at(i))!=G.at(min).end())
+			{
+				if (l.at(iter.at(i)) > (l.at(min) + G.at(min).at(iter.at(i))))
+				{
+					l.at(iter.at(i)) = l.at(min) + G.at(min).at(iter.at(i));
+				}
 			}
 		}
 	}
+	return std::pair<int,std::map<int,float>> {s,l};
 }
 
 //metric closure
@@ -226,8 +230,8 @@ void main_algorithm(std::map<int,std::map<int,float> > G, int mean)
 {
 	//initialize parameters
 	int h=0;
-	reduce(G);
-		
+	//reduce(G);
+	std::cout<<dijk(G,0).second.at(1)<<std::endl;
 }
 
 //main function
