@@ -1,7 +1,7 @@
 
 //////////////////////////////////////////////////////
 //                                                  //
-//  Edmonds max. cardinality matching algorithm     //
+//  Minimum Mean Weight Cycle Algorithm             //
 //                                                  //
 //  written by Christopher Fillmore                 //
 //             Giridhar Shenoy                      //
@@ -210,9 +210,15 @@ void metric_closure(std::map<int,std::map<int,float> > G)
 }
 
 //find minimum weight empty set join
-void empty(std::map<int,std::map<int,float> > G)
+void empty_tjoin(std::map<int,std::map<int,float> > G)
 {
 	
+}
+
+//minimum weight perfect matching
+void MWPMP()
+{
+
 }
 
 //main algorithm
