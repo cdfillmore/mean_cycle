@@ -7,8 +7,8 @@
 //             Giridhar Shenoy                      //
 //             Nadezhda Vassilyeva                  //
 //                                                  //
-//  to compile: g++ Blossom.cc -o bloss -std=c++11  //
-//  to execute: bloss test.dmx                      //
+//  to compile: g++ join.cc -o join -std=c++11      //
+//  to execute: join w_test1.dmx                    //
 //                                                  //
 //////////////////////////////////////////////////////
 
@@ -17,6 +17,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <limits>
 #include <map>
 #include <algorithm>
 
@@ -46,6 +47,31 @@ std::vector<int> union_1(std::vector<int> v1, std::vector<int> v2)
 	std::set_union(v1.begin(),v1.end(),v2.begin(),v2.end(),std::back_inserter(v3));
 	
 	return v3;
+}
+
+//symmetric difference of vectors
+std::vector<int> symmetric(std::vector<int> v1, std::vector<int> v2)
+{
+	std::vector<int> v3;
+	
+	sort(v1.begin(), v1.end());
+	sort(v2.begin(), v2.end());
+	
+	std::set_symmetric_difference(v1.begin(),v1.end(),v2.begin(),v2.end(),std::back_inserter(v3));
+	
+	return v3;
+}
+
+//print a vector
+void print_vector(std::vector<int> a)
+{
+	std::string out1="";
+	for (int i=0; i<a.size(); i++)
+	{
+		out1.append(" ");
+		out1.append(std::to_string(a.at(i)));
+	}
+	std::cout<<out1<<std::endl;
 }
 
 //read in the Graph (set the base index to 0 instead of 1)
@@ -89,7 +115,7 @@ std::map<int,std::map<int,float> > read_graph(char* file)
 }
 
 //print the matching in dimacs format (fix base index to 1 again)
-void print_vector(std::vector<int> V)
+void output_dmx(std::vector<int> V)
 {
 	std::string tmp;
 	int v_max = V.size();
@@ -140,12 +166,62 @@ void reduce(std::map<int,std::map<int,float>>& G)
 	}
 }
 
+//dijkstra's algorithm
+std::map<int,float> dijk(std::map<int,std::map<int,float> > G, int s)
+{
+	std::map<int,float> l;
+	std::vector<int> R = {};
+	std::vector<int> V = {};
+	for (int i=0;i<G.size();i++)
+	{
+		V.push_back(i);
+		l.insert(std::pair<int,float>(i,std::numeric_limits<float>::infinity()));
+	}
+	l[s] = 0;
+	
+	iter = intersect(V,symmetric(R,V));
+	min=l.at(iter.at(0));
+	for (int i=1;i<iter.size();i++)
+	{
+		if (l.at(iter.at(i)) < l.at(min))
+		{
+			min=iter.at(i);
+		}
+	}
+	R.push_back(min);
+	iter = intersect(V,symmetric(R,V));
+	for (int i=0;i<iter.size();i++)
+	{
+		id = G.at(min).find(iter.at(i));
+		if (id !=G.at(min).end())
+		{
+			if (l.at(iter.at(i)) > (l.at(min) + ))
+			{
+				
+			}
+		}
+	}
+}
+
+//metric closure
+void metric_closure(std::map<int,std::map<int,float> > G)
+{
+	
+}
+
+//find minimum weight empty set join
+void empty(std::map<int,std::map<int,float> > G)
+{
+	
+}
+
 //main algorithm
 void main_algorithm(std::map<int,std::map<int,float> > G, int mean)
 {
 	//initialize parameters
 	int h=0;
 	reduce(G);
+		
 }
 
 //main function
@@ -169,7 +245,7 @@ int main(int argc, char* argv[])
 		//std::vector<int> mu = find_max_mu(G,mean);
 		//print the mu vector
 		//std::cout<<mean<<std::endl;
-		//print_vector(mu);
+		//output_dmx(mu);
 		return 0;
 	}
 }
