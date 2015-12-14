@@ -1,15 +1,15 @@
 
 //////////////////////////////////////////////////////
-//                                                  //
-//  Minimum Mean Weight Cycle Algorithm             //
-//                                                  //
-//  written by Christopher Fillmore                 //
-//             Giridhar Shenoy                      //
-//             Nadezhda Vassilyeva                  //
-//                                                  //
+//						  //
+//  Minimum Mean Weight Cycle Algorithm	     //
+//						  //
+//  written by Christopher Fillmore		 //
+//	     Giridhar Shenoy		      //
+//	     Nadezhda Vassilyeva		  //
+//						  //
 //  to compile: g++ join.cc -o join -std=c++11      //
-//  to execute: join w_test1.dmx                    //
-//                                                  //
+//  to execute: join w_test1.dmx		    //
+//						  //
 //////////////////////////////////////////////////////
 
 #include <iostream>
@@ -75,7 +75,7 @@ void print_vector(std::vector<int> a)
 }
 
 //read in the Graph (set the base index to 0 instead of 1)
-std::map<int,std::map<int,float> > read_graph(char* file)
+std::map<int,std::map<int,int> > read_graph(char* file)
 {
 	FILE* fp;
 	char line[4092];
@@ -85,7 +85,7 @@ std::map<int,std::map<int,float> > read_graph(char* file)
 	int e_max;
 	int a;
 	int b;
-	float c;
+	int c;
 
 	fp = fopen (file , "r");
 	summary = fgets(line, sizeof(line), fp);
@@ -94,12 +94,12 @@ std::map<int,std::map<int,float> > read_graph(char* file)
 	ss << summary;
 	ss >> tmp >> tmp >> v_max >> e_max;
 	
-	std::map<int,std::map<int,float> > G;
+	std::map<int,std::map<int,int> > G;
 	std::stringstream entry;
 
 	for (int i=0; i<v_max; i++)
 	{
-		G[i] = std::map<int,float>({});
+		G[i] = std::map<int,int>({});
 	}
 
 	for (int i=0; i<e_max; i++)
@@ -107,11 +107,53 @@ std::map<int,std::map<int,float> > read_graph(char* file)
 		fgets(line, sizeof(line), fp);
 		ss << line;
 		ss >> tmp >> a >> b >> c;
-		G[a-1].insert(std::pair<int,float>(b-1,c));
-		G[b-1].insert(std::pair<int,float>(a-1,c));
+		G[a-1].insert(std::pair<int,int>(b-1,c));
+		G[b-1].insert(std::pair<int,int>(a-1,c));
 	}
 	fclose(fp);
 	return G;
+}
+
+//print graph in dimacs format (fix base index to 1 again)
+void dmx2tmp(std::map<int,std::map<int,int>> G, std::vector<int> T, std::string tmp)
+{
+	std::string s1 = "";
+	int count = 0;
+	for (auto const v : G)
+	{
+		if (std::find(T.begin(),T.end(),v.first) != T.end())
+		{
+			for (auto const w : v.second)
+			{
+				if (std::find(T.begin(),T.end(),w.first) != T.end())
+				{
+					s1.append("\ne ");
+					s1.append(to_string(v.first+1));
+					s1.append(" ");
+					s1.append(to_string(w.first+1));
+					s1.append(" ");
+					s1.append(to_string(w.second));
+					count++;
+				}
+			}
+		}
+	}
+	std::string s2 = "p edge ";
+	s2.append(to_string(T.size()));
+	s2.append(" ");
+	s2.append(to_string(count));
+	s2.append(s1);
+	
+	std::string cmd = "rm ";
+	cmd.append(tmp);
+	cmd.append(" 2> /dev/null; touch ");
+	cmd.append(tmp);
+	system(cmd.c_str());
+
+	ofstream myfile;
+	myfile.open(tmp.c_str());
+	myfile << s2;
+	myfile.close();
 }
 
 //print the matching in dimacs format (fix base index to 1 again)
@@ -144,9 +186,38 @@ void output_dmx(std::vector<int> V)
 	std::cout<<tmp<<std::endl;
 }
 
-void reduce(std::map<int,std::map<int,float>>& G)
+//find vertices with negative weight edges
+void Gpos_Tminus(std::map<int,std::map<int,int>> G, std::map<int,std::map<int,int>> &Gpos, std::vector<int> &Tm)
 {
-	float m=G.begin()->second.begin()->second;
+	int count;
+	std::map<int,int> tmp;
+	for (auto const v : G)
+	{
+		tmp = {};
+		count =0;
+		for (auto const w : v.second)
+		{
+			if (0>w.second)
+			{
+				count = 1;
+				tmp.insert(std::pair<int,int>(w.first,-w.second));
+			}
+			else
+			{
+				tmp.insert(w);
+			}
+		}
+		Gpos.insert(std::pair<int,std::map<int,int>>(v.first,tmp));
+		if (count == 1)
+		{
+			Tm.push_back(v.first);
+		}
+	}
+}
+
+void reduce(std::map<int,std::map<int,int>> G)
+{
+	int m=G.begin()->second.begin()->second;
 	for (auto const v : G)
 	{
 		for (auto const w : v.second)
@@ -167,9 +238,9 @@ void reduce(std::map<int,std::map<int,float>>& G)
 }
 
 //dijkstra's algorithm
-std::pair<int,std::map<int,float>> dijk(std::map<int,std::map<int,float> > G, int s)
+std::pair<int,std::map<int,int>> dijk(std::map<int,std::map<int,int> > G, int s)
 {
-	std::map<int,float> l;
+	std::map<int,int> l;
 	std::vector<int> R = {};
 	std::vector<int> V = {};
 	int min;
@@ -177,7 +248,7 @@ std::pair<int,std::map<int,float>> dijk(std::map<int,std::map<int,float> > G, in
 	for (int i=0;i<G.size();i++)
 	{
 		V.push_back(i);
-		l.insert(std::pair<int,float>(i,std::numeric_limits<float>::infinity()));
+		l.insert(std::pair<int,int>(i,std::numeric_limits<int>::max()));
 	}
 	l[s] = 0;
 	std::vector<int> iter = intersection(V,symmetric(R,V));
@@ -204,34 +275,63 @@ std::pair<int,std::map<int,float>> dijk(std::map<int,std::map<int,float> > G, in
 			}
 		}
 	}
-	return std::pair<int,std::map<int,float>> {s,l};
+	l.erase(s);
+	std::map<int,int> L;
+	for (auto const v : l)
+	{
+		if (std::numeric_limits<int>::max() != v.second)
+		{
+			L.insert(v);
+		}
+	}
+	return std::pair<int,std::map<int,int>> {s,L};
 }
 
 //metric closure
-void metric_closure(std::map<int,std::map<int,float> > G)
+std::map<int,std::map<int,int>> metric_closure(std::map<int,std::map<int,int> > G)
 {
-	
-}
-
-//find minimum weight empty set join
-void empty_tjoin(std::map<int,std::map<int,float> > G)
-{
-	
+	std::map<int,std::map<int,int>> Gbar = {};
+	for (int i=0;i<G.size();i++)
+	{
+		Gbar.insert(dijk(G,i));
+	}
+	return Gbar;		
 }
 
 //minimum weight perfect matching
-void MWPMP()
+std::map<int,std::map<int,int>> MWPMP(std::map<int,std::map<int,int>> G, std::vector<int> T)
 {
+	//write_file
+	dmx2tmp(G,T,"./tmp.dmx");
+	//do system call to blossom5
+	system("rm ./tmp2.dmx 2> /dev/null; touch ./tmp2.dmx");
+	system("./blossom5 -e ./tmp.dmx -w ./tmp2.dmx");
+	//read file back in
+	return G;
+}
 
+//find minimum weight empty set join
+void min_tjoin(std::map<int,std::map<int,int> > G, std::vector<int> T)
+{
+	std::map<int,std::map<int,int>> Gbar = metric_closure(G);
+	std::map<int,std::map<int,int>> MWPM = MWPMP(Gbar,T);
+	
 }
 
 //main algorithm
-void main_algorithm(std::map<int,std::map<int,float> > G, int mean)
+void main_algorithm(std::map<int,std::map<int,int> > G, int mean)
 {
 	//initialize parameters
-	int h=0;
-	//reduce(G);
-	std::cout<<dijk(G,0).second.at(1)<<std::endl;
+	std::vector<int> T = {};
+	std::vector<int> Tminus = {};
+	std::map<int,std::map<int,int>> Gpos = {};
+
+	//apply values
+	Gpos_Tminus(G,Gpos,Tminus);
+	std::vector<int> T2 = symmetric(T,Tminus);
+	
+	//compute min t-join
+	min_tjoin(Gpos,T2);
 }
 
 //main function
@@ -247,7 +347,7 @@ int main(int argc, char* argv[])
 	{
 		system("echo \"hi\"");
 		//read Graph
-		std::map<int,std::map<int,float> > G = read_graph(argv[1]);
+		std::map<int,std::map<int,int> > G = read_graph(argv[1]);
 		//set mean to zero
 		int mean = 0;
 		main_algorithm(G,mean);
