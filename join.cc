@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <string>
+#include <string.h>
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -75,7 +76,7 @@ void print_vector(std::vector<int> a)
 }
 
 //read in the Graph (dimacs) (set the base index to 0 instead of 1)
-std::map<int,std::map<int,float> > read_graph(char* file)
+std::map<int,std::map<int,double> > read_graph(char* file)
 {
 	FILE* fp;
 	char line[4092];
@@ -85,7 +86,7 @@ std::map<int,std::map<int,float> > read_graph(char* file)
 	int e_max;
 	int a;
 	int b;
-	float c;
+	double c;
 
 	fp = fopen (file , "r");
 	summary = fgets(line, sizeof(line), fp);
@@ -94,28 +95,33 @@ std::map<int,std::map<int,float> > read_graph(char* file)
 	ss << summary;
 	ss >> tmp >> tmp >> v_max >> e_max;
 	
-	std::map<int,std::map<int,float> > G;
+	std::map<int,std::map<int,double> > G;
 	std::stringstream entry;
 
 	for (int i=0; i<v_max; i++)
 	{
-		G[i] = std::map<int,float>({});
+		G[i] = std::map<int,double>({});
 	}
-
-	for (int i=0; i<e_max; i++)
+	int i = 0;
+	while (i<e_max)
 	{
 		fgets(line, sizeof(line), fp);
+		if ((char)line[0] == 'c')
+		{
+			continue;
+		}
 		ss << line;
 		ss >> tmp >> a >> b >> c;
-		G[a-1].insert(std::pair<int,float>(b-1,c));
-		G[b-1].insert(std::pair<int,float>(a-1,c));
+		G[a-1].insert(std::pair<int,double>(b-1,c));
+		G[b-1].insert(std::pair<int,double>(a-1,c));
+		i++;
 	}
 	fclose(fp);
 	return G;
 }
 
 //read in the Graph (non - dimacs) (set the base index to 0 instead of 1)
-std::map<int,std::map<int,float> > read_graph_no_dimacs(char const * file, std::map<int,std::map<int,float>> Gold)
+std::map<int,std::map<int,double> > read_graph_no_dimacs(char const * file, std::map<int,std::map<int,double>> Gold, std::map<int,int> IC)
 {
 	FILE* fp;
 	char line[4092];
@@ -133,12 +139,12 @@ std::map<int,std::map<int,float> > read_graph_no_dimacs(char const * file, std::
 	ss << summary;
 	ss >> v_max >> e_max;
 	
-	std::map<int,std::map<int,float> > G;
+	std::map<int,std::map<int,double> > G;
 	std::stringstream entry;
 
 	for (int i=0; i<v_max; i++)
 	{
-		G[i] = std::map<int,float>({});
+		G[i] = std::map<int,double>({});
 	}
 
 	for (int i=0; i<e_max; i++)
@@ -146,8 +152,8 @@ std::map<int,std::map<int,float> > read_graph_no_dimacs(char const * file, std::
 		fgets(line, sizeof(line), fp);
 		ss << line;
 		ss >> a >> b;
-		G[a-1].insert(std::pair<int,float>(b,Gold.at(a).at(b)));
-		G[b-1].insert(std::pair<int,float>(a,Gold.at(b).at(a)));
+		G[IC.at(a+1)].insert(std::pair<int,double>(IC.at(b+1),Gold.at(IC.at(a+1)).at(IC.at(b+1))));
+		G[IC.at(b+1)].insert(std::pair<int,double>(IC.at(a+1),Gold.at(IC.at(b+1)).at(IC.at(a+1))));
 	}
 	fclose(fp);
 	return G;
@@ -155,31 +161,44 @@ std::map<int,std::map<int,float> > read_graph_no_dimacs(char const * file, std::
 
 
 //print graph in dimacs format (fix base index to 1 again)
-void dmx2tmp(std::map<int,std::map<int,float>> G, std::vector<int> T, std::string tmp)
+void dmx2tmp(std::map<int,std::map<int,double>> G, std::string tmp, std::map<int,int> &IC)
 {
 	std::string s1 = "";
 	int count = 0;
+	int iter = 0;
+	std::map<int,int> out {};
 	for (auto const v : G)
 	{
-		if (std::find(T.begin(),T.end(),v.first) != T.end())
+		if (IC.find(v.first) == IC.end())
 		{
-			for (auto const w : v.second)
+			iter++;
+			IC[v.first]=iter;
+			out[iter]=v.first;
+		}
+		for (auto const w : v.second)
+		{
+			if (v.first > w.first)
 			{
-				if (std::find(T.begin(),T.end(),w.first) != T.end())
-				{
-					s1.append("\ne ");
-					s1.append(to_string(v.first+1));
-					s1.append(" ");
-					s1.append(to_string(w.first+1));
-					s1.append(" ");
-					s1.append(to_string(w.second));
-					count++;
-				}
+				continue;
 			}
+			if (IC.find(w.first) == IC.end())
+			{
+				iter++;
+				IC[w.first]=iter;
+				out[iter]=w.first;
+			}
+			s1.append("\ne ");
+			s1.append(to_string(IC[v.first]));
+			s1.append(" ");
+			s1.append(to_string(IC[w.first]));
+			s1.append(" ");
+			//s1.append(to_string(int(w.second*10000.0)));
+			s1.append(to_string(w.second));
+			count++;
 		}
 	}
 	std::string s2 = "p edge ";
-	s2.append(to_string(T.size()));
+	s2.append(to_string(IC.size()));
 	s2.append(" ");
 	s2.append(to_string(count));
 	s2.append(s1);
@@ -194,10 +213,11 @@ void dmx2tmp(std::map<int,std::map<int,float>> G, std::vector<int> T, std::strin
 	myfile.open(tmp.c_str());
 	myfile << s2;
 	myfile.close();
+	IC = out;
 }
 
 //print graph in dimacs format (fix base index to 1 again)
-void dmx2tmp2(std::map<int,std::map<int,float>> G, std::string tmp)
+void dmx2tmp2(std::map<int,std::map<int,double>> G, std::string tmp)
 {
 	std::string s1 = "";
 	int count = 0;
@@ -205,13 +225,16 @@ void dmx2tmp2(std::map<int,std::map<int,float>> G, std::string tmp)
 	{
 		for (auto const w : v.second)
 		{
-			s1.append("\ne ");
-			s1.append(to_string(v.first+1));
-			s1.append(" ");
-			s1.append(to_string(w.first+1));
-			s1.append(" ");
-			s1.append(to_string(w.second));
-			count++;
+			if (v.first < w.first)
+			{
+				s1.append("\ne ");
+				s1.append(to_string(v.first+1));
+				s1.append(" ");
+				s1.append(to_string(w.first+1));
+				s1.append(" ");
+				s1.append(to_string(w.second));
+				count++;
+			}
 		}
 	}
 	std::string s2 = "p edge ";
@@ -232,73 +255,110 @@ void dmx2tmp2(std::map<int,std::map<int,float>> G, std::string tmp)
 	myfile.close();
 }
 
+//find edge in stack
+int FindInStack(std::map<int,std::map<int,double>> stack, std::pair<int,int> edge)
+{
+	if (stack.find(edge.first)==stack.end())	
+	{
+		if (stack[edge.first].find(edge.second)==stack[edge.first].end())
+		{	
+			return 0;
+		}
+	}
+	return 1;
+}
 
 //symmetric difference on edge sets
-std::map<int,std::map<int,float>> E_symmetric(std::map<int,std::map<int,float>> G1, std::map<int,std::map<int,float>> G2, float &weight, int &length)
+std::map<int,std::map<int,double>> E_symmetric(std::vector<std::map<int,std::map<int,double>>> vG)
 {
-	std::map<int,std::map<int,float>> out = {};
-	std::map<int,float> tmp1;
-	std::map<int,float> tmp2;
-	float SUM;
-	for (auto const v : G1)
+	std::map<int,std::map<int,double>> good = {};
+	std::map<int,std::map<int,double>> bad  = {};
+	for ( unsigned int i=0; i<vG.size(); i++)
 	{
-		tmp1 = {};
-		if (G2.find(v.first) == G2.end())
+		for ( auto v : vG.at(i) )
 		{
-			tmp1 = v.second;
-			SUM = 0.0;
-			for(std::map<int,float>::iterator it = tmp1.begin(); it != tmp1.end(); ++it) SUM += it->second;
-			weight += SUM;
-			length += tmp1.size();
-		}
-		else
-		{
-			for (auto const w : v.second)
+			for ( auto w : v.second )
 			{
-				if (G2.at(v.first).find(w.second) == G2.at(v.first).end())
+				if (FindInStack(bad,std::pair<int,int>(v.first,w.first))==1)
 				{
-					tmp1.insert(w);
-					weight += w.second;
-					length++;
+					continue;
+				}
+				if (FindInStack(good,std::pair<int,int>(v.first,w.first))==1)
+				{
+					good[v.first].erase(w.first);
+				}
+				else if (good.find(v.first) != good.end())
+				{
+					good[v.first].insert(w);
+				}
+				else
+				{
+					good[v.first] = {};
+					good[v.first].insert(w);
 				}
 			}
 		}
-		out.insert(std::pair<int,std::map<int,float>>(v.first,tmp1));
 	}
-	for (auto const v : G2)
+	return good;
+}
+
+//reconstruct shortest path
+std::map<int,std::map<int,double>> reconstruct(int a, int b, std::map<int,std::map<int,int>> P, std::map<int,std::map<int,double>> G)
+{
+	std::map<int,std::map<int,double>> out = {};
+	int i=b;
+	while (true)
 	{
-		if (G1.find(v.first) == G1.end())
+		if (P[a][i] == a)
 		{
-			tmp2 = v.second;
-			SUM = 0.0;
-			for(std::map<int,float>::iterator it = tmp2.begin(); it != tmp2.end(); ++it) SUM += it->second;
-			weight += SUM;
-			length += tmp2.size();
-			
+			out[i].insert(std::pair<int,double>(a,G[i][a]));
+			out[a].insert(std::pair<int,double>(i,G[a][i]));
+			return out;
 		}
-		else
-		{
-			for (auto const w : v.second)
-			{
-				if (G1.at(v.first).find(w.second) == G1.at(v.first).end())
-				{
-					tmp2.insert(w);
-					weight += w.second;
-					length++;
-				}
-			}
-		}
-		out.insert(std::pair<int,std::map<int,float>>(v.first,tmp2));
+		out[i].insert(std::pair<int,double>(a,G[i][P[a][i]]));
+		out[P[a][i]].insert(std::pair<int,double>(P[a][i],G[P[a][i]][i]));
+		i = P[a][i];
 	}
 	return out;
 }
 
+//find symetric difference of shortest paths of perfect matching
+std::map<int,std::map<int,double>> SymPath(std::map<int,std::map<int,double>> PM, std::map<int,std::map<int,int>> P, std::map<int,std::map<int,double>> G)
+{
+	std::map<int,std::map<int,double>> out = {};
+	std::vector<std::map<int,std::map<int,double>>> tmp = {}; 
+	for (auto const v : PM)
+	{
+		for (auto const w : v.second)
+		{
+			tmp.push_back(reconstruct(v.first,w.first,P,G));
+		}
+	}
+	return E_symmetric(tmp);
+}
+
+//find weigh and length of t-join
+void findWeight(std::map<int,std::map<int,double>> G, double &weight, int &length)
+{
+	for (auto v : G)
+	{
+		for (auto w : v.second)
+		{
+			if (v.first < w.first)
+			{
+				weight+=w.second;
+				length++;
+			}
+		}
+	}
+}
+
 //find vertices with negative weight edges
-void Gpos_Tminus(std::map<int,std::map<int,float>> G, std::map<int,std::map<int,float>> &Gpos, std::vector<int> &Tm,std::map<int,std::map<int,float>> &Em)
+void Gpos_Tminus(std::map<int,std::map<int,double>> G, std::map<int,std::map<int,double>> &Gpos, std::vector<int> &Tm,std::map<int,std::map<int,double>> &Em)
 {
 	int count;
-	std::map<int,float> tmp;
-	std::map<int,float> tmp2;
+	std::map<int,double> tmp;
+	std::map<int,double> tmp2;
 	for (auto const v : G)
 	{
 		tmp = {};
@@ -308,16 +368,16 @@ void Gpos_Tminus(std::map<int,std::map<int,float>> G, std::map<int,std::map<int,
 			if (0.0>w.second)
 			{
 				count = 1;
-				tmp.insert(std::pair<int,float>(w.first,-w.second));
-				tmp2.insert(std::pair<int,float>(w.first,w.second));
+				tmp.insert(std::pair<int,double>(w.first,-w.second));
+				tmp2.insert(std::pair<int,double>(w.first,w.second));
 			}
 			else
 			{
 				tmp.insert(w);
 			}
 		}
-		Gpos.insert(std::pair<int,std::map<int,float>>(v.first,tmp));
-		Em.insert(std::pair<int,std::map<int,float>>(v.first,tmp2));
+		Gpos.insert(std::pair<int,std::map<int,double>>(v.first,tmp));
+		Em.insert(std::pair<int,std::map<int,double>>(v.first,tmp2));
 		if (count == 1)
 		{
 			Tm.push_back(v.first);
@@ -326,11 +386,11 @@ void Gpos_Tminus(std::map<int,std::map<int,float>> G, std::map<int,std::map<int,
 }
 
 //reduction step in algorithm
-std::map<int,std::map<int,float>> reduce(std::map<int,std::map<int,float>> G)
+std::map<int,std::map<int,double>> reduce(std::map<int,std::map<int,double>> G)
 {
-	std::map<int,std::map<int,float>> out;
-	std::map<int,float> tmp;
-	float m=G.begin()->second.begin()->second;
+	std::map<int,std::map<int,double>> out;
+	std::map<int,double> tmp;
+	double m=G.begin()->second.begin()->second;
 	for (auto const v : G)
 	{
 		for (auto const w : v.second)
@@ -346,15 +406,15 @@ std::map<int,std::map<int,float>> reduce(std::map<int,std::map<int,float>> G)
 		tmp = {};
 		for (auto w : v.second)
 		{
-			tmp.insert(std::pair<int,float>(w.first,w.second - m));
+			tmp.insert(std::pair<int,double>(w.first,w.second - m));
 		}
-		out.insert(std::pair<int,std::map<int,float>>(v.first,tmp));
+		out.insert(std::pair<int,std::map<int,double>>(v.first,tmp));
 	}
 	return out;
 }
 
 // add weight of t-join to all edges
-void reduce_by(std::map<int,std::map<int,float>> &G, float C)
+void reduce_by(std::map<int,std::map<int,double>> &G, double C)
 {
 	for (auto v : G)
 	{
@@ -366,9 +426,9 @@ void reduce_by(std::map<int,std::map<int,float>> &G, float C)
 }
 
 //dijkstra's algorithm
-std::pair<int,std::map<int,float>> dijk(std::map<int,std::map<int,float> > G, int s)
+std::pair<int,std::map<int,double>> dijk(std::map<int,std::map<int,double> > G, int s, std::map<int,int> &P, std::vector<int> T)
 {
-	std::map<int,float> l;
+	std::map<int,double> l;
 	std::vector<int> R = {};
 	std::vector<int> V = {};
 	int min;
@@ -376,7 +436,7 @@ std::pair<int,std::map<int,float>> dijk(std::map<int,std::map<int,float> > G, in
 	for (unsigned int i=0;i<G.size();i++)
 	{
 		V.push_back(i);
-		l.insert(std::pair<int,float>(i,std::numeric_limits<float>::max()));
+		l.insert(std::pair<int,double>(i,std::numeric_limits<double>::max()));
 	}
 	l[s] = 0.0;
 	std::vector<int> iter = intersection(V,symmetric(R,V));
@@ -399,89 +459,121 @@ std::pair<int,std::map<int,float>> dijk(std::map<int,std::map<int,float> > G, in
 				if (l.at(iter.at(i)) > (l.at(min) + G.at(min).at(iter.at(i))))
 				{
 					l.at(iter.at(i)) = l.at(min) + G.at(min).at(iter.at(i));
+					P[iter.at(i)] = min;
 				}
 			}
 		}
 	}
 	l.erase(s);
-	std::map<int,float> L;
+	std::map<int,double> L;
 	for (auto const v : l)
 	{
+		if (std::find(T.begin(), T.end(), v.first) == T.end())
+		{
+			continue;
+		}
 		if (std::numeric_limits<int>::max() != v.second)
 		{
 			L.insert(v);
 		}
 	}
-	return std::pair<int,std::map<int,float>> {s,L};
+	return std::pair<int,std::map<int,double>> {s,L};
 }
 
 //metric closure
-std::map<int,std::map<int,float>> metric_closure(std::map<int,std::map<int,float> > G)
+std::map<int,std::map<int,double>> metric_closure(std::map<int,std::map<int,double> > G, std::vector<int> T, std::map<int,std::map<int,int>> &P)
 {
-	std::map<int,std::map<int,float>> Gbar = {};
-	for (unsigned int i=0;i<G.size();i++)
+	std::map<int,std::map<int,double>> Gbar = {};
+	std::pair<int,std::map<int,double>> D;
+	std::map<int,int> tmp;
+	for (auto v : G)
 	{
-		Gbar.insert(dijk(G,i));
+		if (std::find(T.begin(),T.end(), v.first) == T.end())
+		{
+			continue;
+		}
+		tmp = {};
+		std::cout<<"hello b"<<std::endl;
+		Gbar.insert(dijk(G,v.first,tmp,T));
+		P[v.first] = tmp;
+		std::cout<<"hello c"<<std::endl;
+		P.insert(std::pair<int,std::map<int,int>>(v.first,tmp));
 	}
 	return Gbar;		
 }
 
 //minimum weight perfect matching
-std::map<int,std::map<int,float>> MWPMP(std::map<int,std::map<int,float>> G, std::vector<int> T)
+std::map<int,std::map<int,double>> MWPMP(std::map<int,std::map<int,double>> G)
 {
-	print_vector(T);
+	std::map<int,int> IC {};
 	//write_file
-	dmx2tmp(G,T,"./tmp.dmx");
+	dmx2tmp2(G,"./surprise.dmx");
+	dmx2tmp(G,"./tmp.dmx",IC);
+	std::cout<<"hello 1.5"<<std::endl;
 	//do system call to blossom5
 	system("rm ./tmp2.dmx 2> /dev/null; touch ./tmp2.dmx");
 	system("./blossom5 -V -e ./tmp.dmx -w ./tmp2.dmx >./junk.txt");
 	std::cout<<"hello2"<<std::endl;
 	//read file back in
-	std::map<int,std::map<int,float>> M = read_graph_no_dimacs("./tmp2.dmx",G);
+	std::map<int,std::map<int,double>> M = read_graph_no_dimacs("./tmp2.dmx",G,IC);
+	dmx2tmp2(M,"./dump.dmx");
 	std::cout<<"hello2"<<std::endl;
-	system("rm ./tmp* 2> /dev/null");
+	//system("rm ./tmp* 2> /dev/null");
 	return M;
 }
 
 //find minimum weight empty set join
-std::map<int,std::map<int,float>> min_tjoin(std::map<int,std::map<int,float> > G, float &weight, int &length)
+std::map<int,std::map<int,double>> min_tjoin(std::map<int,std::map<int,double> > G)
 {
 	//initialize parameters
-	std::vector<int> T = {};
 	std::vector<int> Tminus = {};
-	std::map<int,std::map<int,float>> Eminus = {};
-	std::map<int,std::map<int,float>> Gpos = {};
+	std::map<int,std::map<int,double>> Eminus = {};
+	std::map<int,std::map<int,double>> Gpos = {};
+	std::map<int,std::map<int,int>> P = {};
+	std::map<int,std::map<int,double>> out = {};
+	std::vector<std::map<int,std::map<int,double>>> tmp = {};
 
 	//apply values
 	Gpos_Tminus(G,Gpos,Tminus,Eminus);
-	std::vector<int> T2 = symmetric(T,Tminus);
+	dmx2tmp2(Eminus,"./eminus.dmx");
 
-	std::map<int,std::map<int,float>> Gbar = metric_closure(Gpos);
-	std::map<int,std::map<int,float>> MWPM = MWPMP(Gbar,T2);
+	std::cout<<"hello a"<<std::endl;
+	std::map<int,std::map<int,double>> Gbar = metric_closure(Gpos,Tminus,P);
+	std::cout<<"hello b"<<std::endl;
+	dmx2tmp2(Gbar,"./gbar.dmx");
+	print_vector(Tminus);
+	std::map<int,std::map<int,double>> MWPM = MWPMP(Gbar);
 	//symmetric difference on edge sets
-	return E_symmetric(MWPM,Eminus,weight,length); 
+	tmp.push_back(SymPath(MWPM,P,Gpos));
+	dmx2tmp2(SymPath(MWPM,P,Gpos),"./trying.dmx");
+	tmp.push_back(Eminus); 
+	out = E_symmetric(tmp); 
+	return out;
 }
 
 //main algorithm
-void main_algorithm(std::map<int,std::map<int,float> > G)
+void main_algorithm(std::map<int,std::map<int,double> > G)
 {
-	std::map<int,std::map<int,float>> ejoin;
-	std::map<int,std::map<int,float>> rG = reduce(G);
+	std::map<int,std::map<int,double>> ejoin;
+	std::map<int,std::map<int,double>> rG = reduce(G);
 	dmx2tmp2(rG,"./blah2.dmx");
-	float weight;
+	double weight;
 	int length;
 	int counter=0;
-	while (true)
+	while (counter<1)
+	//while (true)
 	{
 		//compute min t-join
 		weight = 0.0;
 		length = 0;
 		std::cout<<"hello1"<<std::endl;
-		ejoin = min_tjoin(rG,weight,length);
+		dmx2tmp2(rG,"./blah.dmx");
+		ejoin = min_tjoin(rG);
+		findWeight(ejoin,weight,length);	
+		dmx2tmp2(ejoin,"./joinold.dmx");
 		std::cout<<"hello n"<<std::endl;
 		counter++;
 		
-		dmx2tmp2(rG,"./blah.dmx");
 		std::cout<<weight<<std::endl;
 		if ( weight < 1e-5 )
 		{
@@ -492,13 +584,12 @@ void main_algorithm(std::map<int,std::map<int,float> > G)
 			}
 			else
 			{
-				dmx2tmp2(ejoin,"./joinold.dmx");
-				reduce_by(rG, -weight/((float)length));
+				reduce_by(rG, -weight/((double)length));
 			}
 		}
 		else
 		{
-			reduce_by(rG, -weight/((float)length));
+			reduce_by(rG, -weight/((double)length));
 		}
 	}
 	
@@ -517,7 +608,7 @@ int main(int argc, char* argv[])
 	{
 		system("echo \"hi\"");
 		//read Graph
-		std::map<int,std::map<int,float> > G = read_graph(argv[1]);
+		std::map<int,std::map<int,double> > G = read_graph(argv[1]);
 		//run algorithm
 		main_algorithm(G);
 		return 0;
