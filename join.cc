@@ -221,10 +221,19 @@ void dmx2tmp2(std::map<int,std::map<int,double>> G, std::string tmp)
 {
 	std::string s1 = "";
 	int count = 0;
+	std::vector<int> unique = {};
 	for (auto const v : G)
 	{
+		if (std::find(unique.begin(),unique.end(),v.first)==unique.end())
+		{
+			unique.push_back(v.first);
+		}
 		for (auto const w : v.second)
 		{
+			if (std::find(unique.begin(),unique.end(),w.first)==unique.end())
+			{
+				unique.push_back(w.first);
+			}
 			if (v.first < w.first)
 			{
 				s1.append("\ne ");
@@ -238,7 +247,7 @@ void dmx2tmp2(std::map<int,std::map<int,double>> G, std::string tmp)
 		}
 	}
 	std::string s2 = "p edge ";
-	s2.append(to_string(G.size()));
+	s2.append(to_string(unique.size()));
 	s2.append(" ");
 	s2.append(to_string(count));
 	s2.append(s1);
@@ -266,6 +275,20 @@ int FindInStack(std::map<int,std::map<int,double>> stack, std::pair<int,int> edg
 		}
 	}
 	return 0;
+}
+
+std::map<int,std::map<int,double>> fix_weight(std::map<int,std::map<int,double>> Gr, std::map<int,std::map<int,double>> Gw)
+{
+	std::map<int,std::map<int,double>> out = {};
+	for ( auto v : Gw)
+	{
+		out[v.first] = {};
+		for (auto w : v.second)
+		{
+			out[v.first].insert(std::pair<int,double>(w.first,Gr[v.first][w.first]));
+		}
+	}
+	return out;
 }
 
 //symmetric difference on edge sets
@@ -296,6 +319,15 @@ std::map<int,std::map<int,double>> E_symmetric(std::vector<std::map<int,std::map
 				{
 					std::cout<<"out 1"<<std::endl;
 					good[v.first].erase(w.first);
+					if (bad.find(v.first) != bad.end())
+					{
+						bad[v.first].insert(w);
+					}
+					else
+					{
+						bad[v.first] = {};
+						bad[v.first].insert(w);
+					}
 				}
 				else if (good.find(v.first) != good.end())
 				{
@@ -328,21 +360,24 @@ std::map<int,std::map<int,double>> reconstruct(int a, int b, std::map<int,std::m
 	std::cout<<"bam "<<a<<" "<<b<<std::endl;
 	std::map<int,std::map<int,double>> out = {};
 	int i=b;
+	out[b] = {};
 	while (true)
 	{
 		std::cout<<"bam2"<<std::endl;
 		if (P[a][i] == a)
 		{
-			std::cout<<"bingo inner "<<i<<std::endl;
+			std::cout<<"bingo inner "<<i<<" "<<P[a][i]<<std::endl;
 			out[i].insert(std::pair<int,double>(a,G[i][a]));
+			out[a] = {};
 			out[a].insert(std::pair<int,double>(i,G[a][i]));
 			std::cout<<"bam3"<<std::endl;
 			dmx2tmp2(out,"./duh.dmx");
 			return out;
 		}
-		std::cout<<"bingo "<<i<<std::endl;
-		out[i].insert(std::pair<int,double>(a,G[i][P[a][i]]));
-		out[P[a][i]].insert(std::pair<int,double>(P[a][i],G[P[a][i]][i]));
+		std::cout<<"bingo "<<i<<" "<<P[a][i]<<std::endl;
+		out[i].insert(std::pair<int,double>(P[a][i],G[i][P[a][i]]));
+		out[P[a][i]] = {};
+		out[P[a][i]].insert(std::pair<int,double>(i,G[P[a][i]][i]));
 		i = P[a][i];
 	}
 }
@@ -572,6 +607,11 @@ std::map<int,std::map<int,double>> min_tjoin(std::map<int,std::map<int,double> >
 
 	//apply values
 	Gpos_Tminus(G,Gpos,Tminus,Eminus);
+	if (Tminus.size() == 0)
+	{
+		out = dfs(G);
+		return out
+	}
 	dmx2tmp2(Eminus,"./eminus.dmx");
 	dmx2tmp2(Gpos,"./gpos.dmx");
 
@@ -594,13 +634,14 @@ std::map<int,std::map<int,double>> min_tjoin(std::map<int,std::map<int,double> >
 void main_algorithm(std::map<int,std::map<int,double> > G)
 {
 	std::map<int,std::map<int,double>> ejoin;
+	std::map<int,std::map<int,double>> ejoin2;
 	std::map<int,std::map<int,double>> rG = reduce(G);
 	dmx2tmp2(rG,"./blah2.dmx");
 	double weight;
 	int length;
 	int counter=0;
-	while (counter<2)
-	//while (true)
+	//while (counter<1)
+	while (true)
 	{
 		//compute min t-join
 		weight = 0.0;
@@ -608,8 +649,9 @@ void main_algorithm(std::map<int,std::map<int,double> > G)
 		std::cout<<"hello1"<<std::endl;
 		dmx2tmp2(rG,"./blah.dmx");
 		ejoin = min_tjoin(rG);
-		findWeight(ejoin,weight,length);	
-		dmx2tmp2(ejoin,"./joinold.dmx");
+		ejoin2 = fix_weight(rG,ejoin);
+		findWeight(ejoin2,weight,length);	
+		dmx2tmp2(ejoin2,"./joinold.dmx");
 		std::cout<<"hello n"<<std::endl;
 		counter++;
 		
@@ -618,12 +660,15 @@ void main_algorithm(std::map<int,std::map<int,double> > G)
 		{
 			if (weight > -1e-5)
 			{
-				dmx2tmp2(ejoin,"./join.dmx");
+				ejoin = dfs(ejoin2);
+				ejoin2 = fix_weight(G,ejoin);
+				dmx2tmp2(ejoin2,"./join.dmx");
 				break;
 			}
 			else
 			{
 				reduce_by(rG, -weight/((double)length));
+				std::cout<<"reduce by "<<-weight/((double)length)<<std::endl;
 			}
 		}
 		else
@@ -655,4 +700,3 @@ int main(int argc, char* argv[])
 }
 
 // The End //
-
