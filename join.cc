@@ -192,8 +192,8 @@ void dmx2tmp(std::map<int,std::map<int,double>> G, std::string tmp, std::map<int
 			s1.append(" ");
 			s1.append(to_string(IC[w.first]));
 			s1.append(" ");
-			//s1.append(to_string(int(w.second*10000.0)));
-			s1.append(to_string(w.second));
+			s1.append(to_string(int(w.second*10000.0)));
+			//s1.append(to_string(w.second));
 			count++;
 		}
 	}
@@ -261,7 +261,7 @@ int FindInStack(std::map<int,std::map<int,double>> stack, std::pair<int,int> edg
 	if (stack.find(edge.first)==stack.end())	
 	{
 		if (stack[edge.first].find(edge.second)==stack[edge.first].end())
-		{	
+		{
 			return 0;
 		}
 	}
@@ -271,11 +271,13 @@ int FindInStack(std::map<int,std::map<int,double>> stack, std::pair<int,int> edg
 //symmetric difference on edge sets
 std::map<int,std::map<int,double>> E_symmetric(std::vector<std::map<int,std::map<int,double>>> vG)
 {
-	std::map<int,std::map<int,double>> good = {};
+	std::map<int,std::map<int,double>> good = vG.at(0);
 	std::map<int,std::map<int,double>> bad  = {};
-	for ( unsigned int i=0; i<vG.size(); i++)
+	dmx2tmp2(good,"./good1.dmx");
+	for ( unsigned int i=1; i<vG.size(); i++)
 	{
-		for ( auto v : vG.at(i) )
+		std::cout<<"HEEEEEEEEELLLLLLLLLLLOOOOOOOOOOOOO"<<std::endl;
+		for (auto v : vG.at(i))
 		{
 			for ( auto w : v.second )
 			{
@@ -285,41 +287,55 @@ std::map<int,std::map<int,double>> E_symmetric(std::vector<std::map<int,std::map
 				}
 				if (FindInStack(good,std::pair<int,int>(v.first,w.first))==1)
 				{
+					std::cout<<"out 1"<<std::endl;
 					good[v.first].erase(w.first);
 				}
 				else if (good.find(v.first) != good.end())
 				{
+					std::cout<<"in 1"<<std::endl;
 					good[v.first].insert(w);
 				}
 				else
 				{
+					std::cout<<"in 2"<<std::endl;
 					good[v.first] = {};
 					good[v.first].insert(w);
 				}
 			}
 		}
 	}
+	for ( auto v : good )
+	{
+		if (v.second.size() == 0)
+		{
+			good.erase(v.first);
+		}
+	}
+	dmx2tmp2(good,"./good.dmx");
 	return good;
 }
 
 //reconstruct shortest path
 std::map<int,std::map<int,double>> reconstruct(int a, int b, std::map<int,std::map<int,int>> P, std::map<int,std::map<int,double>> G)
 {
+	std::cout<<"bam"<<std::endl;
 	std::map<int,std::map<int,double>> out = {};
 	int i=b;
 	while (true)
 	{
+		std::cout<<"bam2"<<std::endl;
 		if (P[a][i] == a)
 		{
 			out[i].insert(std::pair<int,double>(a,G[i][a]));
 			out[a].insert(std::pair<int,double>(i,G[a][i]));
+			std::cout<<"bam3"<<std::endl;
+			dmx2tmp2(out,"./duh.dmx");
 			return out;
 		}
 		out[i].insert(std::pair<int,double>(a,G[i][P[a][i]]));
 		out[P[a][i]].insert(std::pair<int,double>(P[a][i],G[P[a][i]][i]));
 		i = P[a][i];
 	}
-	return out;
 }
 
 //find symetric difference of shortest paths of perfect matching
@@ -331,6 +347,7 @@ std::map<int,std::map<int,double>> SymPath(std::map<int,std::map<int,double>> PM
 	{
 		for (auto const w : v.second)
 		{
+			std::cout<<"bam1"<<std::endl;
 			tmp.push_back(reconstruct(v.first,w.first,P,G));
 		}
 	}
@@ -362,14 +379,18 @@ void Gpos_Tminus(std::map<int,std::map<int,double>> G, std::map<int,std::map<int
 	for (auto const v : G)
 	{
 		tmp = {};
-		count =0;
+		tmp2 = {};
+		count =1;
 		for (auto const w : v.second)
 		{
 			if (0.0>w.second)
 			{
-				count = 1;
+				count*=-1;
 				tmp.insert(std::pair<int,double>(w.first,-w.second));
-				tmp2.insert(std::pair<int,double>(w.first,w.second));
+				if (v.first < w.first)
+				{
+					tmp2.insert(std::pair<int,double>(w.first,w.second));
+				}
 			}
 			else
 			{
@@ -378,7 +399,8 @@ void Gpos_Tminus(std::map<int,std::map<int,double>> G, std::map<int,std::map<int
 		}
 		Gpos.insert(std::pair<int,std::map<int,double>>(v.first,tmp));
 		Em.insert(std::pair<int,std::map<int,double>>(v.first,tmp2));
-		if (count == 1)
+		std::cout<<count<<std::endl;
+		if (count == -1)
 		{
 			Tm.push_back(v.first);
 		}
@@ -536,17 +558,19 @@ std::map<int,std::map<int,double>> min_tjoin(std::map<int,std::map<int,double> >
 	//apply values
 	Gpos_Tminus(G,Gpos,Tminus,Eminus);
 	dmx2tmp2(Eminus,"./eminus.dmx");
+	dmx2tmp2(Gpos,"./gpos.dmx");
 
 	std::cout<<"hello a"<<std::endl;
 	std::map<int,std::map<int,double>> Gbar = metric_closure(Gpos,Tminus,P);
 	std::cout<<"hello b"<<std::endl;
-	dmx2tmp2(Gbar,"./gbar.dmx");
 	print_vector(Tminus);
 	std::map<int,std::map<int,double>> MWPM = MWPMP(Gbar);
+	dmx2tmp2(MWPM,"./pow.dmx");
 	//symmetric difference on edge sets
-	tmp.push_back(SymPath(MWPM,P,Gpos));
+	tmp.push_back(SymPath(MWPM,P,G));
 	dmx2tmp2(SymPath(MWPM,P,Gpos),"./trying.dmx");
 	tmp.push_back(Eminus); 
+	std::cout<<"now!"<<std::endl;
 	out = E_symmetric(tmp); 
 	return out;
 }
