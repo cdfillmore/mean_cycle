@@ -258,14 +258,14 @@ void dmx2tmp2(std::map<int,std::map<int,double>> G, std::string tmp)
 //find edge in stack
 int FindInStack(std::map<int,std::map<int,double>> stack, std::pair<int,int> edge)
 {
-	if (stack.find(edge.first)==stack.end())	
+	if (stack.find(edge.first)!=stack.end())
 	{
-		if (stack[edge.first].find(edge.second)==stack[edge.first].end())
+		if (stack[edge.first].find(edge.second)!=stack[edge.first].end())
 		{
-			return 0;
+			return 1;
 		}
 	}
-	return 1;
+	return 0;
 }
 
 //symmetric difference on edge sets
@@ -273,19 +273,26 @@ std::map<int,std::map<int,double>> E_symmetric(std::vector<std::map<int,std::map
 {
 	std::map<int,std::map<int,double>> good = vG.at(0);
 	std::map<int,std::map<int,double>> bad  = {};
-	dmx2tmp2(good,"./good1.dmx");
+	dmx2tmp2(vG.at(0),"./good1.dmx");
 	for ( unsigned int i=1; i<vG.size(); i++)
 	{
 		std::cout<<"HEEEEEEEEELLLLLLLLLLLOOOOOOOOOOOOO"<<std::endl;
+		dmx2tmp2(vG.at(i),"./good2.dmx");
+		dmx2tmp2(good,"./good3.dmx");
 		for (auto v : vG.at(i))
 		{
 			for ( auto w : v.second )
 			{
-				if (FindInStack(bad,std::pair<int,int>(v.first,w.first))==1)
+				if (v.first > w.first)
 				{
 					continue;
 				}
-				if (FindInStack(good,std::pair<int,int>(v.first,w.first))==1)
+				else if (FindInStack(bad,std::pair<int,int>(v.first,w.first))==1)
+				{
+					std::cout<<" passing bad"<<std::endl;
+					continue;
+				}
+				else if (FindInStack(good,std::pair<int,int>(v.first,w.first))==1)
 				{
 					std::cout<<"out 1"<<std::endl;
 					good[v.first].erase(w.first);
@@ -318,7 +325,7 @@ std::map<int,std::map<int,double>> E_symmetric(std::vector<std::map<int,std::map
 //reconstruct shortest path
 std::map<int,std::map<int,double>> reconstruct(int a, int b, std::map<int,std::map<int,int>> P, std::map<int,std::map<int,double>> G)
 {
-	std::cout<<"bam"<<std::endl;
+	std::cout<<"bam "<<a<<" "<<b<<std::endl;
 	std::map<int,std::map<int,double>> out = {};
 	int i=b;
 	while (true)
@@ -326,12 +333,14 @@ std::map<int,std::map<int,double>> reconstruct(int a, int b, std::map<int,std::m
 		std::cout<<"bam2"<<std::endl;
 		if (P[a][i] == a)
 		{
+			std::cout<<"bingo inner "<<i<<std::endl;
 			out[i].insert(std::pair<int,double>(a,G[i][a]));
 			out[a].insert(std::pair<int,double>(i,G[a][i]));
 			std::cout<<"bam3"<<std::endl;
 			dmx2tmp2(out,"./duh.dmx");
 			return out;
 		}
+		std::cout<<"bingo "<<i<<std::endl;
 		out[i].insert(std::pair<int,double>(a,G[i][P[a][i]]));
 		out[P[a][i]].insert(std::pair<int,double>(P[a][i],G[P[a][i]][i]));
 		i = P[a][i];
@@ -347,10 +356,16 @@ std::map<int,std::map<int,double>> SymPath(std::map<int,std::map<int,double>> PM
 	{
 		for (auto const w : v.second)
 		{
-			std::cout<<"bam1"<<std::endl;
-			tmp.push_back(reconstruct(v.first,w.first,P,G));
+			if (v.first < w.first)
+			{
+				std::cout<<"bam1"<<std::endl;
+				tmp.push_back(reconstruct(v.first,w.first,P,G));
+				dmx2tmp2(reconstruct(v.first,w.first,P,G),"./goomba.dmx");
+			}
 		}
 	}
+	dmx2tmp2(tmp.at(0),"./halp.dmx");
+	std::cout<<"bam11  " <<tmp.size()<<std::endl;
 	return E_symmetric(tmp);
 }
 
@@ -570,7 +585,7 @@ std::map<int,std::map<int,double>> min_tjoin(std::map<int,std::map<int,double> >
 	tmp.push_back(SymPath(MWPM,P,G));
 	dmx2tmp2(SymPath(MWPM,P,Gpos),"./trying.dmx");
 	tmp.push_back(Eminus); 
-	std::cout<<"now!"<<std::endl;
+	std::cout<<"now!  "<<tmp.size()<<std::endl;
 	out = E_symmetric(tmp); 
 	return out;
 }
@@ -584,7 +599,7 @@ void main_algorithm(std::map<int,std::map<int,double> > G)
 	double weight;
 	int length;
 	int counter=0;
-	while (counter<1)
+	while (counter<2)
 	//while (true)
 	{
 		//compute min t-join
